@@ -1,0 +1,40 @@
+# Python virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Python cache / bytecode
+__pycache__/
+*.py[cod]
+
+# Test / coverage
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Packaging
+build/
+dist/
+*.egg-info/
+
+# Environment variables (add your own if you use them)
+.env
+.env.*
+*.env
+
+# Logs
+*.log
+
+# IDE/editor
+.vscode/
+.idea/
+.DS_Store
+
+#  AWS Lambda layers build
+lambda-layers/python
+
+# Basic commands file
+basic_commands.txt

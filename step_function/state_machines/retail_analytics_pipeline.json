@@ -1,0 +1,78 @@
+{
+    "Comment": "State Machine for Retail Analytics ETL",
+    "StartAt": "generate_bronze_orders",
+    "States": {
+      "generate_bronze_orders": {
+        "Type": "Task",
+        "Resource": "arn:aws:states:::lambda:invoke",
+        "Output": "{% $states.result.Payload %}",
+        "Arguments": {
+          "FunctionName": "arn:aws:lambda:<region>:<account_id>:function:retail_data_generator:$LATEST",
+          "Payload": "{% $states.input %}"
+        },
+        "Retry": [
+          {
+            "ErrorEquals": [
+              "Lambda.ServiceException",
+              "Lambda.AWSLambdaException",
+              "Lambda.SdkClientException",
+              "Lambda.TooManyRequestsException"
+            ],
+            "IntervalSeconds": 1,
+            "MaxAttempts": 3,
+            "BackoffRate": 2,
+            "JitterStrategy": "FULL"
+          }
+        ],
+        "Next": "bronze_orders_crawler"
+      },
+      "bronze_orders_crawler": {
+        "Type": "Task",
+        "Arguments": {
+          "Name": "bronze_orders_crawler"
+        },
+        "Resource": "arn:aws:states:::aws-sdk:glue:startCrawler",
+        "Next": "Wait",
+        "Retry": [
+          {
+            "ErrorEquals": [
+              "States.TaskFailed",
+              "Glue.ConcurrentRunsExceededException",
+              "Glue.OperationTimeoutException"
+            ],
+            "BackoffRate": 2,
+            "IntervalSeconds": 1,
+            "MaxAttempts": 3,
+            "JitterStrategy": "FULL"
+          }
+        ]
+      },
+      "Wait": {
+        "Type": "Wait",
+        "Seconds": 30,
+        "Next": "orders_bronze_to_silver"
+      },
+      "orders_bronze_to_silver": {
+        "Type": "Task",
+        "Resource": "arn:aws:states:::glue:startJobRun.sync",
+        "Arguments": {
+          "JobName": "orders_bronze_to_silver"
+        },
+        "End": true,
+        "Retry": [
+          {
+            "ErrorEquals": [
+              "States.TaskFailed",
+              "Glue.ConcurrentRunsExceededException",
+              "Glue.OperationTimeoutException"
+            ],
+            "BackoffRate": 2,
+            "IntervalSeconds": 1,
+            "MaxAttempts": 3,
+            "JitterStrategy": "FULL"
+          }
+        ]
+      }
+    },
+    "QueryLanguage": "JSONata"
+  }

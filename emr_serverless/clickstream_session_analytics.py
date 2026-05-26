@@ -5,7 +5,18 @@ from pyspark.sql.functions import (
     count,
     when,
     unix_timestamp,
-    to_timestamp
+    to_timestamp,
+    col
+)
+
+INPUT_PATH = (
+    "s3://retail-analytics-platform/"
+    "bronze/clickstream/"
+)
+
+OUTPUT_PATH = (
+    "s3://retail-analytics-platform/"
+    "gold/clickstream_sessions/"
 )
 
 spark = SparkSession.builder.appName(
@@ -39,7 +50,7 @@ session_df = (
 
         max(
             when(
-                df.event_type == "purchase",
+                col("event_type") == "purchase",
                 1
             ).otherwise(0)
         ).alias("purchased")

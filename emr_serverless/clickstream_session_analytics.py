@@ -23,14 +23,18 @@ spark = SparkSession.builder.appName(
     "ClickstreamSessionAnalytics"
 ).getOrCreate()
 
+print("Reading clickstream data...")
+
 df = spark.read.json(
-    "s3://retail-analytics-platform/bronze/clickstream/"
+    INPUT_PATH
 )
 
 df = df.withColumn(
     "event_timestamp",
     to_timestamp("event_timestamp")
 )
+
+print("Calculating session analytics...")
 
 session_df = (
     df.groupBy(
@@ -57,6 +61,10 @@ session_df = (
     )
 )
 
+print(
+    f"Total sessions: {session_df.count()}"
+)
+
 session_df = session_df.withColumn(
     "session_duration_seconds",
 
@@ -70,10 +78,14 @@ output_path = (
     "gold/clickstream_sessions/"
 )
 
+print("Writing gold dataset to S3...")
+
 session_df.write.mode(
     "overwrite"
 ).parquet(
-    output_path
+    OUTPUT_PATH
 )
+
+print("Job completed successfully.")
 
 spark.stop()

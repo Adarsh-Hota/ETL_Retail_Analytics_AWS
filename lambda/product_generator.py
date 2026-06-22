@@ -74,6 +74,8 @@ def generate_products(num_records=100):
             2
         )
 
+        popularity_score = random.randint(1, 100)
+
         product = {
             "product_id": (
                 f"PROD_{uuid.uuid4().hex[:8].upper()}"
@@ -95,6 +97,8 @@ def generate_products(num_records=100):
             "cost_price": cost_price,
 
             "price": price,
+
+            "popularity_score": popularity_score,
 
             "launch_date": (
                 datetime.now()

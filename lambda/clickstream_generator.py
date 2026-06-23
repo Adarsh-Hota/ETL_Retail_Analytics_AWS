@@ -11,14 +11,17 @@ EVENT_TYPES = [
     "purchase"
 ]
 
-def generate_clickstream_events(num_sessions=20):
+def generate_clickstream_events(customer_ids, product_ids, num_sessions=20):
 
     events = []
 
     for _ in range(num_sessions):
 
         session_id = f"SESS_{uuid.uuid4().hex[:8]}"
-        customer_id = f"CUST_{random.randint(1000, 9999)}"
+        
+        customer_id = random.choice(
+            customer_ids
+        )
 
         session_start = datetime.now()
 
@@ -60,7 +63,7 @@ def generate_clickstream_events(num_sessions=20):
                 "session_id": session_id,
                 "customer_id": customer_id,
                 "event_type": event_type,
-                "product_id": f"PROD_{random.randint(100, 999)}",
+                "product_id": random.choice(product_ids),
                 "event_timestamp": event_timestamp.isoformat()
             }
 

@@ -20,7 +20,7 @@ WAREHOUSES = [
 ]
 
 
-def generate_inventory_events(num_records=100):
+def generate_inventory_events(product_ids, num_records=100):
 
     inventory_events = []
 
@@ -44,8 +44,8 @@ def generate_inventory_events(num_records=100):
             "inventory_event_id": (
                 f"INV_{uuid.uuid4().hex[:8].upper()}"
             ),
-            "product_id": (
-                f"PROD_{random.randint(100,999)}"
+            "product_id": random.choice(
+                product_ids
             ),
             "warehouse_id": random.choice(
                 WAREHOUSES

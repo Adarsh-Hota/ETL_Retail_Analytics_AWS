@@ -22,68 +22,67 @@ BUCKET_NAME = os.environ["BUCKET_NAME"]
 
 
 def lambda_handler(event, context):
-
-    df = generate_orders(100)
-
+    
     now = datetime.now()
 
     year = now.strftime("%Y")
     month = now.strftime("%m")
     day = now.strftime("%d")
 
-    filename = f"orders_{uuid.uuid4().hex}.csv"
-
-    local_path = f"/tmp/{filename}"
-
-    s3_path = (
-        f"bronze/orders/"
-        f"year={year}/"
-        f"month={month}/"
-        f"day={day}/"
-        f"{filename}"
-    )
-
-    # Save CSV locally
-    df.to_csv(local_path, index=False)
-
-    # Upload to S3
-    s3.upload_file(
-        local_path,
-        BUCKET_NAME,
-        s3_path
-    )
-
-    # Generate clickstream events
-    clickstream_events = generate_clickstream_events()
-
-    clickstream_filename = (
-        f"clickstream_{uuid.uuid4().hex}.json"
-    )
-
-    clickstream_local_path = (
-        f"/tmp/{clickstream_filename}"
-    )
-
-    clickstream_s3_path = (
-        f"bronze/clickstream/"
-        f"year={year}/"
-        f"month={month}/"
-        f"day={day}/"
-        f"{clickstream_filename}"
-    )
-
-    with open(clickstream_local_path, "w") as f:
-
-        for event in clickstream_events:
-            f.write(json.dumps(event) + "\n")
-
-    s3.upload_file(
-        clickstream_local_path,
-        BUCKET_NAME,
-        clickstream_s3_path
-    )
-
     customer_df = generate_customers(100)
+
+    customer_ids = (
+        customer_df["customer_id"]
+        .tolist()
+    )
+
+    product_df = generate_products(100)
+
+    product_ids = (
+        product_df["product_id"]
+        .tolist()
+    )
+
+    product_lookup = (
+        product_df
+        .set_index("product_id")
+        [["price", "popularity_score"]]
+        .to_dict("index")
+    )
+
+    order_df = generate_orders(
+        customer_ids=customer_ids, 
+        product_lookup=product_lookup, 
+        num_records=100
+    )
+
+    order_ids = (
+        order_df["order_id"]
+        .tolist()
+    )
+
+    order_lookup = (
+        order_df
+        .set_index("order_id")
+        ["total_amount"]
+        .to_dict()
+    )
+
+    payment_df = generate_payments(
+        order_lookup,
+        num_records=100
+    )
+
+    inventory_df = generate_inventory_events(
+        product_ids=product_ids, 
+        num_records=100
+    )
+
+    clickstream_events = generate_clickstream_events(
+            customer_ids=customer_ids,
+            product_ids=product_ids,
+            num_sessions=20
+    )
 
     customer_filename = (
     f"customers_{uuid.uuid4().hex}.csv"
@@ -112,8 +111,6 @@ def lambda_handler(event, context):
         customer_s3_path
     )
 
-    product_df = generate_products(100)
-
     product_filename = (
         f"products_{uuid.uuid4().hex}.csv"
     )
@@ -141,7 +138,27 @@ def lambda_handler(event, context):
         product_s3_path
     )
 
-    payment_df = generate_payments(100)
+    order_filename = f"orders_{uuid.uuid4().hex}.csv"
+
+    local_path = f"/tmp/{order_filename}"
+
+    s3_path = (
+        f"bronze/orders/"
+        f"year={year}/"
+        f"month={month}/"
+        f"day={day}/"
+        f"{order_filename}"
+    )
+
+    # Save CSV locally
+    df.to_csv(local_path, index=False)
+
+    # Upload to S3
+    s3.upload_file(
+        local_path,
+        BUCKET_NAME,
+        s3_path
+    )
 
     payment_filename = (
         f"payments_{uuid.uuid4().hex}.csv"
@@ -174,8 +191,6 @@ def lambda_handler(event, context):
         payment_s3_path
     )
 
-    inventory_df = generate_inventory_events(100)
-
     inventory_filename = f"inventory_{uuid.uuid4().hex}.csv"
 
     inventory_local_path = f"/tmp/{inventory_filename}"
@@ -196,6 +211,33 @@ def lambda_handler(event, context):
         inventory_local_path,
         BUCKET_NAME,
         inventory_s3_path
+    )
+
+    clickstream_filename = (
+        f"clickstream_{uuid.uuid4().hex}.json"
+    )
+
+    clickstream_local_path = (
+        f"/tmp/{clickstream_filename}"
+    )
+
+    clickstream_s3_path = (
+        f"bronze/clickstream/"
+        f"year={year}/"
+        f"month={month}/"
+        f"day={day}/"
+        f"{clickstream_filename}"
+    )
+
+    with open(clickstream_local_path, "w") as f:
+
+        for event in clickstream_events:
+            f.write(json.dumps(event) + "\n")
+
+    s3.upload_file(
+        clickstream_local_path,
+        BUCKET_NAME,
+        clickstream_s3_path
     )
 
     return {

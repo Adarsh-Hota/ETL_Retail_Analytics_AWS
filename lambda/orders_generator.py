@@ -5,7 +5,7 @@ import pandas as pd
 from datetime import datetime
 
 
-def generate_orders(num_records=100):
+def generate_orders(customer_ids, product_lookup, num_records=100):
 
     orders = []
 
@@ -25,13 +25,25 @@ def generate_orders(num_records=100):
 
     for _ in range(num_records):
 
+        product_ids = list(product_lookup.keys())
+        weights = [
+            product_lookup[p]["popularity_score"]
+            for p in product_ids
+        ]
+        product_id = random.choices(
+            product_ids,
+            weights=weights,
+            k=1
+        )[0]
         quantity = random.randint(1, 5)
-        unit_price = round(random.uniform(100, 5000), 2)
+        unit_price = product_lookup[
+            product_id
+        ]["price"]
 
         order = {
             "order_id": str(uuid.uuid4()),
-            "customer_id": f"CUST_{random.randint(1000, 9999)}",
-            "product_id": f"PROD_{random.randint(100, 999)}",
+            "customer_id": random.choice(customer_ids),
+            "product_id": product_id,
             "quantity": quantity,
             "unit_price": unit_price,
             "total_amount": round(quantity * unit_price, 2),

@@ -70,3 +70,59 @@ def generate_clickstream_events(customer_ids, product_ids, num_sessions=20):
             events.append(event)
 
     return events
+
+
+def generate_clickstream_from_orders(
+    order_df
+):
+
+    events = []
+
+    for _, order in order_df.iterrows():
+
+        session_id = (
+            f"SESS_{uuid.uuid4().hex[:8]}"
+        )
+
+        customer_id = order[
+            "customer_id"
+        ]
+
+        product_id = order[
+            "product_id"
+        ]
+
+        base_time = datetime.fromisoformat(
+            order["order_timestamp"]
+        )
+
+        session_events = [
+            "view_product",
+            "add_to_cart",
+            "checkout",
+            "purchase"
+        ]
+
+        for i, event_type in enumerate(
+            session_events
+        ):
+
+            event = {
+                "session_id": session_id,
+                "customer_id": customer_id,
+                "event_type": event_type,
+                "product_id": product_id,
+                "event_timestamp": (
+                    base_time -
+                    timedelta(
+                        minutes=(
+                            len(session_events)
+                            - i
+                        )
+                    )
+                ).isoformat()
+            }
+
+            events.append(event)
+
+    return events

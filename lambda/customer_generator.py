@@ -18,6 +18,14 @@ def generate_customers(num_records=100):
         "Platinum"
     ]
 
+    PREFERRED_CATEGORIES = [
+        "Electronics",
+        "Fashion",
+        "Home",
+        "Sports",
+        "Books"
+    ]
+
     customers = []
 
     for _ in range(num_records):
@@ -38,7 +46,10 @@ def generate_customers(num_records=100):
             "loyalty_tier": random.choices(
                 loyalty_tiers,
                 weights=[50, 30, 15, 5]
-            )[0]
+            )[0],
+            "preferred_category": random.choice(
+                PREFERRED_CATEGORIES
+            )
         }
 
         customers.append(customer)

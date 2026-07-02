@@ -71,3 +71,42 @@ def generate_inventory_events(product_ids, num_records=100):
     return pd.DataFrame(
         inventory_events
     )
+
+
+def generate_inventory_from_orders(order_df):
+
+    inventory_events = []
+
+    for _, order in order_df.iterrows():
+
+        inventory_event = {
+            "inventory_event_id": (
+                f"INV_{uuid.uuid4().hex[:8].upper()}"
+            ),
+
+            "product_id": order[
+                "product_id"
+            ],
+
+            "warehouse_id": random.choice(
+                WAREHOUSES
+            ),
+
+            "movement_type": "SALE",
+
+            "quantity_change": -abs(
+                order["quantity"]
+            ),
+
+            "event_timestamp": order[
+                "order_timestamp"
+            ]
+        }
+
+        inventory_events.append(
+            inventory_event
+        )
+
+    return pd.DataFrame(
+        inventory_events
+    )

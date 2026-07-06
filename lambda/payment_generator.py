@@ -22,24 +22,23 @@ PAYMENT_STATUSES = [
 ]
 
 
-def generate_payments(num_records=100):
+def generate_payments(order_lookup, num_records=100):
 
     payments = []
 
     for _ in range(num_records):
 
-        amount = round(
-            random.uniform(100, 10000),
-            2
+        order_id = random.choice(
+            list(order_lookup.keys())
         )
+
+        amount = order_lookup[order_id]
 
         payment = {
             "payment_id": (
                 f"PAY_{uuid.uuid4().hex[:8].upper()}"
             ),
-            "order_id": (
-                f"ORD_{uuid.uuid4().hex[:8].upper()}"
-            ),
+            "order_id": order_id,
             "payment_method": random.choices(
                 PAYMENT_METHODS,
                 weights=[50, 20, 15, 10, 5]

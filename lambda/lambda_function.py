@@ -1,17 +1,30 @@
 import boto3
 import json
 import os
+import pandas as pd
 import uuid
 
 from datetime import datetime
 from faker import Faker
-
-from clickstream_generator import generate_clickstream_events
+from cleanup_utils import (
+    reset_data_lake
+)
+from clickstream_generator import (
+    generate_clickstream_events,
+    generate_clickstream_from_orders
+)
 from customer_generator import generate_customers
-from inventory_generator import generate_inventory_events
+from inventory_generator import (
+    generate_inventory_events,
+    generate_inventory_from_orders
+)
 from orders_generator import generate_orders
 from payment_generator import generate_payments
 from product_generator import generate_products
+from s3_utils import (
+    upload_dataframe_to_s3,
+    upload_json_lines_to_s3
+)
 
 
 fake = Faker()
@@ -19,9 +32,32 @@ fake = Faker()
 s3 = boto3.client("s3")
 
 BUCKET_NAME = os.environ["BUCKET_NAME"]
+    
+RESET_DATA_LAKE = (
+    os.environ.get("RESET_DATA_LAKE", "false").lower() == "true"
+)
+
 
 
 def lambda_handler(event, context):
+
+    if RESET_DATA_LAKE:
+
+        print(
+            "Resetting bronze, silver and gold layers..."
+        )
+
+        reset_data_lake(
+            BUCKET_NAME
+        )
+
+        return {
+            "statusCode": 200,
+            "message": (
+                "Bronze, Silver and Gold "
+                "layers successfully reset."
+            )
+        }
     
     now = datetime.now()
 
@@ -36,6 +72,13 @@ def lambda_handler(event, context):
         .tolist()
     )
 
+    customer_lookup = (
+        customer_df
+        .set_index("customer_id")
+        ["preferred_category"]
+        .to_dict()
+    )
+
     product_df = generate_products(100)
 
     product_ids = (
@@ -46,19 +89,15 @@ def lambda_handler(event, context):
     product_lookup = (
         product_df
         .set_index("product_id")
-        [["price", "popularity_score"]]
+        [["price", "popularity_score", "category"]]
         .to_dict("index")
     )
 
     order_df = generate_orders(
-        customer_ids=customer_ids, 
-        product_lookup=product_lookup, 
+        customer_ids=customer_ids,
+        customer_lookup=customer_lookup,
+        product_lookup=product_lookup,
         num_records=100
-    )
-
-    order_ids = (
-        order_df["order_id"]
-        .tolist()
     )
 
     order_lookup = (
@@ -73,185 +112,165 @@ def lambda_handler(event, context):
         num_records=100
     )
 
-    inventory_df = generate_inventory_events(
-        product_ids=product_ids, 
-        num_records=100
+    operational_inventory_df = (
+        generate_inventory_events(
+            product_ids,
+            100
+        )
     )
 
-    clickstream_events = generate_clickstream_events(
+    sales_inventory_df = (
+        generate_inventory_from_orders(
+            order_df
+        )
+    )
+
+    inventory_df = pd.concat(
+        [
+            operational_inventory_df,
+            sales_inventory_df
+        ],
+        ignore_index=True
+    )
+
+    random_clickstream_events = generate_clickstream_events(
             customer_ids=customer_ids,
             product_ids=product_ids,
             num_sessions=20
     )
 
-    customer_filename = (
-    f"customers_{uuid.uuid4().hex}.csv"
+    order_clickstream_events = (
+        generate_clickstream_from_orders(
+            order_df
+        )
     )
 
-    customer_local_path = (
-        f"/tmp/{customer_filename}"
+    clickstream_events = (
+        random_clickstream_events
+        +
+        order_clickstream_events
     )
 
     customer_s3_path = (
-        f"bronze/customers/"
-        f"year={year}/"
-        f"month={month}/"
-        f"day={day}/"
-        f"{customer_filename}"
-    )
-
-    customer_df.to_csv(
-        customer_local_path,
-        index=False
-    )
-
-    s3.upload_file(
-        customer_local_path,
-        BUCKET_NAME,
-        customer_s3_path
-    )
-
-    product_filename = (
-        f"products_{uuid.uuid4().hex}.csv"
-    )
-
-    product_local_path = (
-        f"/tmp/{product_filename}"
+        upload_dataframe_to_s3(
+            customer_df,
+            "customers",
+            year,
+            month,
+            day,
+            s3,
+            BUCKET_NAME
+        )
     )
 
     product_s3_path = (
-        f"bronze/products/"
-        f"year={year}/"
-        f"month={month}/"
-        f"day={day}/"
-        f"{product_filename}"
+        upload_dataframe_to_s3(
+            product_df,
+            "products",
+            year,
+            month,
+            day,
+            s3,
+            BUCKET_NAME
+        )
     )
 
-    product_df.to_csv(
-        product_local_path,
-        index=False
-    )
-
-    s3.upload_file(
-        product_local_path,
-        BUCKET_NAME,
-        product_s3_path
-    )
-
-    order_filename = f"orders_{uuid.uuid4().hex}.csv"
-
-    local_path = f"/tmp/{order_filename}"
-
-    s3_path = (
-        f"bronze/orders/"
-        f"year={year}/"
-        f"month={month}/"
-        f"day={day}/"
-        f"{order_filename}"
-    )
-
-    # Save CSV locally
-    df.to_csv(local_path, index=False)
-
-    # Upload to S3
-    s3.upload_file(
-        local_path,
-        BUCKET_NAME,
-        s3_path
-    )
-
-    payment_filename = (
-        f"payments_{uuid.uuid4().hex}.csv"
-    )
-
-    payment_filename = (
-        f"payments_{uuid.uuid4().hex}.csv"
-    )
-
-    payment_local_path = (
-        f"/tmp/{payment_filename}"
+    order_s3_path = (
+        upload_dataframe_to_s3(
+            order_df,
+            "orders",
+            year,
+            month,
+            day,
+            s3,
+            BUCKET_NAME
+        )
     )
 
     payment_s3_path = (
-        f"bronze/payments/"
-        f"year={year}/"
-        f"month={month}/"
-        f"day={day}/"
-        f"{payment_filename}"
+        upload_dataframe_to_s3(
+            payment_df,
+            "payments",
+            year,
+            month,
+            day,
+            s3,
+            BUCKET_NAME
+        )
     )
-
-    payment_df.to_csv(
-        payment_local_path,
-        index=False
-    )
-
-    s3.upload_file(
-        payment_local_path,
-        BUCKET_NAME,
-        payment_s3_path
-    )
-
-    inventory_filename = f"inventory_{uuid.uuid4().hex}.csv"
-
-    inventory_local_path = f"/tmp/{inventory_filename}"
 
     inventory_s3_path = (
-        f"bronze/inventory/year={year}/"
-        f"month={month}/"
-        f"day={day}/"
-        f"{inventory_filename}"
-    )
-
-    inventory_df.to_csv(
-        inventory_local_path,
-        index=False
-    )
-
-    s3.upload_file(
-        inventory_local_path,
-        BUCKET_NAME,
-        inventory_s3_path
-    )
-
-    clickstream_filename = (
-        f"clickstream_{uuid.uuid4().hex}.json"
-    )
-
-    clickstream_local_path = (
-        f"/tmp/{clickstream_filename}"
+        upload_dataframe_to_s3(
+            inventory_df,
+            "inventory",
+            year,
+            month,
+            day,
+            s3,
+            BUCKET_NAME
+        )
     )
 
     clickstream_s3_path = (
-        f"bronze/clickstream/"
-        f"year={year}/"
-        f"month={month}/"
-        f"day={day}/"
-        f"{clickstream_filename}"
-    )
-
-    with open(clickstream_local_path, "w") as f:
-
-        for event in clickstream_events:
-            f.write(json.dumps(event) + "\n")
-
-    s3.upload_file(
-        clickstream_local_path,
-        BUCKET_NAME,
-        clickstream_s3_path
+        upload_json_lines_to_s3(
+            clickstream_events,
+            "clickstream",
+            year,
+            month,
+            day,
+            s3,
+            BUCKET_NAME
+        )
     )
 
     return {
         "statusCode": 200,
-        "orders_uploaded": f"s3://{BUCKET_NAME}/{s3_path}",
-        "clickstream_uploaded": f"s3://{BUCKET_NAME}/{clickstream_s3_path}",
-        "customers_uploaded": f"s3://{BUCKET_NAME}/{customer_s3_path}",
-        "inventroy_uploaded": f"s3://{BUCKET_NAME}/{inventory_s3_path}",
-        "payments_uploaded": f"s3://{BUCKET_NAME}/{payment_s3_path}",
-        "products_uploaded": f"s3://{BUCKET_NAME}/{product_s3_path}",
-        "orders_generated": len(df),
-        "clickstream_events_generated": len(clickstream_events),
-        "customers_generated": len(customer_df),
-        "inventroy_generated": len(inventory_df),
-        "payments_generated": len(payment_df),
-        "products_generated": len(product_df)
+
+        "customers_uploaded": (
+            f"s3://{BUCKET_NAME}/{customer_s3_path}"
+        ),
+
+        "products_uploaded": (
+            f"s3://{BUCKET_NAME}/{product_s3_path}"
+        ),
+
+        "orders_uploaded": (
+            f"s3://{BUCKET_NAME}/{order_s3_path}"
+        ),
+
+        "payments_uploaded": (
+            f"s3://{BUCKET_NAME}/{payment_s3_path}"
+        ),
+
+        "inventory_uploaded": (
+            f"s3://{BUCKET_NAME}/{inventory_s3_path}"
+        ),
+
+        "clickstream_uploaded": (
+            f"s3://{BUCKET_NAME}/{clickstream_s3_path}"
+        ),
+
+        "customers_generated": len(
+            customer_df
+        ),
+
+        "products_generated": len(
+            product_df
+        ),
+
+        "orders_generated": len(
+            order_df
+        ),
+
+        "payments_generated": len(
+            payment_df
+        ),
+
+        "inventory_generated": len(
+            inventory_df
+        ),
+
+        "clickstream_events_generated": len(
+            clickstream_events
+        )
     }

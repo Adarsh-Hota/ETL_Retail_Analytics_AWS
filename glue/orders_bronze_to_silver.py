@@ -3,7 +3,11 @@ from awsglue.job import Job
 from awsglue.utils import getResolvedOptions
 
 from pyspark.context import SparkContext
-from pyspark.sql.functions import col, current_timestamp, input_file_name, regexp_extract
+from pyspark.sql.functions import (
+    col,
+    current_timestamp,
+    lit
+)
 from pyspark.sql.types import (
     IntegerType,
     DoubleType,
@@ -12,99 +16,172 @@ from pyspark.sql.types import (
 
 import sys
 
-## @params: [JOB_NAME]
-args = getResolvedOptions(sys.argv, ["JOB_NAME"])
+
+# ----------------------------------------------------------
+# Job Arguments
+# ----------------------------------------------------------
+
+args = getResolvedOptions(
+    sys.argv,
+    [
+        "JOB_NAME",
+        "YEAR",
+        "MONTH",
+        "DAY"
+    ]
+)
+
+year = args["YEAR"]
+month = args["MONTH"]
+day = args["DAY"]
+
+
+# ----------------------------------------------------------
+# Job Initialization
+# ----------------------------------------------------------
 
 sc = SparkContext()
+
 glueContext = GlueContext(sc)
+
 spark = glueContext.spark_session
 
 job = Job(glueContext)
-job.init(args["JOB_NAME"], args)
 
-
-# Read bronze data from Glue Catalog
-df = spark.read.option("header", "true").csv(
-    "s3://retail-analytics-platform/bronze/orders/"
+job.init(
+    args["JOB_NAME"],
+    args
 )
 
-products_df = spark.read.parquet(
-    "s3://retail-analytics-platform/silver/products/"
+
+# ----------------------------------------------------------
+# Dynamic Partition Overwrite
+# ----------------------------------------------------------
+
+spark.conf.set(
+    "spark.sql.sources.partitionOverwriteMode",
+    "dynamic"
 )
 
-products_df = products_df.select(
-    "product_id",
-    "category",
-    "subcategory",
-    "brand"
+
+# ----------------------------------------------------------
+# Build Incremental Bronze Path
+# ----------------------------------------------------------
+
+bronze_path = (
+    f"s3://retail-analytics-platform/"
+    f"bronze/orders/"
+    f"year={year}/"
+    f"month={month}/"
+    f"day={day}/"
 )
+
+
+# ----------------------------------------------------------
+# Read Target Bronze Partition
+# ----------------------------------------------------------
+
+df = (
+    spark.read
+    .option(
+        "header",
+        "true"
+    )
+    .csv(
+        bronze_path
+    )
+)
+
+
+# ----------------------------------------------------------
+# Add Partition Columns
+# ----------------------------------------------------------
 
 df = (
     df
     .withColumn(
-        "input_file",
-        input_file_name()
-    )
-    .withColumn(
         "year",
-        regexp_extract(
-            col("input_file"),
-            r"year=(\d+)",
-            1
-        )
+        lit(year)
     )
     .withColumn(
         "month",
-        regexp_extract(
-            col("input_file"),
-            r"month=(\d+)",
-            1
-        )
+        lit(month)
     )
     .withColumn(
         "day",
-        regexp_extract(
-            col("input_file"),
-            r"day=(\d+)",
-            1
-        )
+        lit(day)
     )
 )
 
-# Basic transformations
+
+# ----------------------------------------------------------
+# Clean and Standardize Orders
+# ----------------------------------------------------------
+
 df_cleaned = (
     df
-    .dropDuplicates(["order_id"])
-    .withColumn("quantity", col("quantity").cast(IntegerType()))
-    .withColumn("unit_price", col("unit_price").cast(DoubleType()))
-    .withColumn("total_amount", col("total_amount").cast(DoubleType()))
+    .dropDuplicates(
+        [
+            "order_id"
+        ]
+    )
+    .withColumn(
+        "quantity",
+        col("quantity").cast(
+            IntegerType()
+        )
+    )
+    .withColumn(
+        "unit_price",
+        col("unit_price").cast(
+            DoubleType()
+        )
+    )
+    .withColumn(
+        "total_amount",
+        col("total_amount").cast(
+            DoubleType()
+        )
+    )
+    .withColumn(
+        "order_timestamp",
+        col("order_timestamp").cast(
+            TimestampType()
+        )
+    )
     .withColumn(
         "processed_timestamp",
         current_timestamp()
     )
-    .withColumn(
-        "order_timestamp",
-        col("order_timestamp").cast(TimestampType())
-    )
 )
 
 
-df_enriched = (
-    df_cleaned.join(
-        products_df,
-        on="product_id",
-        how="left"
+# ----------------------------------------------------------
+# Write Target Silver Partition
+# ----------------------------------------------------------
+
+(
+    df_cleaned.write
+
+    .mode(
+        "overwrite"
     )
-)
 
+    .partitionBy(
+        "year",
+        "month",
+        "day"
+    )
 
-# Write parquet to silver layer
-df_enriched.write \
-    .mode("append") \
-    .partitionBy("year", "month", "day") \
     .parquet(
-        "s3://retail-analytics-platform/silver/orders/"
+        "s3://retail-analytics-platform/"
+        "silver/orders/"
     )
+)
 
+
+# ----------------------------------------------------------
+# Commit Job
+# ----------------------------------------------------------
 
 job.commit()

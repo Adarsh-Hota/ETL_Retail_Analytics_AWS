@@ -29,18 +29,19 @@ job.init(args["JOB_NAME"], args)
 logger = glueContext.get_logger()
 logger.info(f"Starting job {args['JOB_NAME']}")
 
-CATALOG = args["catalog_name"]          
-SILVER_DB = args["silver_database"]     
-SILVER_TABLE = args["silver_table"]     
-BRONZE_PATH = args["bronze_path"]
+CATALOG = args["catalog_name"]          # e.g. glue_catalog
+SILVER_DB = args["silver_database"]     # e.g. silver
+SILVER_TABLE = args["silver_table"]     # e.g. products
+BRONZE_PATH = args["bronze_path"]       # e.g. s3://my-bucket/bronze/products/
 
 FULL_TABLE_NAME = f"{CATALOG}.{SILVER_DB}.{SILVER_TABLE}"
+
 
 # ---------------------------------------------------------------------------
 # Create the Silver Iceberg table if it doesn't exist yet
 # ---------------------------------------------------------------------------
 
-spark.sql(f"CREATE DATABASE IF NOT EXISTS {CATALOG}.{SILVER_DB}")
+spark.sql(f"CREATE DATABASE IF NOT EXISTS {SILVER_DB}")
 
 spark.sql(f"""
     CREATE TABLE IF NOT EXISTS {FULL_TABLE_NAME} (

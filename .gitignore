@@ -38,3 +38,7 @@ lambda-layers/python
 
 # Basic commands file
 basic_commands.txt
+
+# Local project planning
+AGENTS.md
+docs/

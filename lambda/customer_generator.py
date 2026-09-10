@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 fake = Faker()
 
 
-def generate_customers(num_records=100):
+def generate_customers(num_records=100, run_id=None, ingested_at=None):
 
     loyalty_tiers = [
         "Bronze",
@@ -35,8 +35,15 @@ def generate_customers(num_records=100):
             timedelta(days=random.randint(1, 1095))
         ).date()
 
+        source_updated_at = datetime.utcnow().isoformat()
         customer = {
+            "source_event_id": str(uuid.uuid4()),
+
             "customer_id": f"CUST_{uuid.uuid4().hex[:8].upper()}",
+
+            "operation": "I",
+
+            "source_updated_at": source_updated_at,
             "first_name": fake.first_name(),
             "last_name": fake.last_name(),
             "email": fake.email(),
@@ -49,7 +56,11 @@ def generate_customers(num_records=100):
             )[0],
             "preferred_category": random.choice(
                 PREFERRED_CATEGORIES
-            )
+            ),
+
+            "ingested_at": ingested_at or source_updated_at,
+
+            "run_id": run_id or str(uuid.uuid4()),
         }
 
         customers.append(customer)

@@ -9,7 +9,9 @@ def generate_orders(
         customer_ids,
         customer_lookup,
         product_lookup,
-        num_records=100
+        num_records=100,
+        run_id=None,
+        ingested_at=None,
     ):
 
     orders = []
@@ -72,8 +74,12 @@ def generate_orders(
             product_id
         ]["price"]
 
+        source_updated_at = datetime.utcnow().isoformat()
         order = {
+            "source_event_id": str(uuid.uuid4()),
             "order_id": str(uuid.uuid4()),
+            "operation": "I",
+            "source_updated_at": source_updated_at,
             "customer_id": customer_id,
             "product_id": product_id,
             "quantity": quantity,
@@ -81,7 +87,9 @@ def generate_orders(
             "total_amount": round(quantity * unit_price, 2),
             "payment_method": random.choice(payment_methods),
             "order_status": random.choice(order_statuses),
-            "order_timestamp": datetime.now().isoformat()
+            "order_timestamp": source_updated_at,
+            "ingested_at": ingested_at or source_updated_at,
+            "run_id": run_id or str(uuid.uuid4()),
         }
 
         orders.append(order)

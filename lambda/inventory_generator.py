@@ -20,7 +20,7 @@ WAREHOUSES = [
 ]
 
 
-def generate_inventory_events(product_ids, num_records=100):
+def generate_inventory_events(product_ids, num_records=100, run_id=None, ingested_at=None):
 
     inventory_events = []
 
@@ -61,7 +61,9 @@ def generate_inventory_events(product_ids, num_records=100):
                         720
                     )
                 )
-            ).isoformat()
+            ).isoformat(),
+            "ingested_at": ingested_at or datetime.utcnow().isoformat(),
+            "run_id": run_id or str(uuid.uuid4()),
         }
 
         inventory_events.append(
@@ -73,7 +75,7 @@ def generate_inventory_events(product_ids, num_records=100):
     )
 
 
-def generate_inventory_from_orders(order_df):
+def generate_inventory_from_orders(order_df, run_id=None, ingested_at=None):
 
     inventory_events = []
 
@@ -100,7 +102,9 @@ def generate_inventory_from_orders(order_df):
 
             "event_timestamp": order[
                 "order_timestamp"
-            ]
+            ],
+            "ingested_at": ingested_at or datetime.utcnow().isoformat(),
+            "run_id": run_id or str(uuid.uuid4()),
         }
 
         inventory_events.append(

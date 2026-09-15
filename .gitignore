@@ -42,3 +42,7 @@ basic_commands.txt
 # Local project planning
 AGENTS.md
 docs/
+
+# Local Redshift operating guides
+redshift/queries/RESET_AND_REBUILD.md
+redshift/queries/gold_serving/README.md

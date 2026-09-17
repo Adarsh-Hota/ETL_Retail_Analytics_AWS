@@ -50,7 +50,7 @@ BRANDS = [
 ]
 
 
-def generate_products(num_records=100):
+def generate_products(num_records=100, run_id=None, ingested_at=None):
 
     products = []
 
@@ -76,10 +76,17 @@ def generate_products(num_records=100):
 
         popularity_score = random.randint(1, 100)
 
+        source_updated_at = datetime.utcnow().isoformat()
         product = {
+            "source_event_id": str(uuid.uuid4()),
+
             "product_id": (
                 f"PROD_{uuid.uuid4().hex[:8].upper()}"
             ),
+
+            "operation": "I",
+
+            "source_updated_at": source_updated_at,
 
             "product_name": (
                 f"{subcategory} Product "
@@ -113,7 +120,11 @@ def generate_products(num_records=100):
 
             "is_active": random.choice(
                 [True, True, True, False]
-            )
+            ),
+
+            "ingested_at": ingested_at or source_updated_at,
+
+            "run_id": run_id or str(uuid.uuid4()),
         }
 
         products.append(product)

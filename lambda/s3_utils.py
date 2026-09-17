@@ -1,4 +1,6 @@
 import json
+import os
+import tempfile
 import uuid
 
 
@@ -53,12 +55,10 @@ def upload_json_lines_to_s3(
 ):
 
     filename = (
-        f"{entity_name}_{uuid.uuid4().hex}.json"
+        f"{entity_name}_{uuid.uuid4().hex}.ndjson"
     )
 
-    local_path = (
-        f"/tmp/{filename}"
-    )
+    local_path = os.path.join(tempfile.gettempdir(), filename)
 
     s3_path = (
         f"bronze/{entity_name}/"
@@ -68,11 +68,11 @@ def upload_json_lines_to_s3(
         f"{filename}"
     )
 
-    with open(local_path, "w") as f:
+    with open(local_path, "w", encoding="utf-8") as f:
 
         for record in records:
             f.write(
-                json.dumps(record)
+                json.dumps(record, separators=(",", ":"), sort_keys=True)
                 + "\n"
             )
 

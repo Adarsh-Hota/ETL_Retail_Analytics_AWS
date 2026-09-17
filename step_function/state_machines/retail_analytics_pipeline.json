@@ -1,78 +1,42 @@
 {
-    "Comment": "State Machine for Retail Analytics ETL",
-    "StartAt": "generate_bronze_orders",
-    "States": {
-      "generate_bronze_orders": {
-        "Type": "Task",
-        "Resource": "arn:aws:states:::lambda:invoke",
-        "Output": "{% $states.result.Payload %}",
-        "Arguments": {
-          "FunctionName": "arn:aws:lambda:<region>:<account_id>:function:retail_data_generator:$LATEST",
-          "Payload": "{% $states.input %}"
-        },
-        "Retry": [
-          {
-            "ErrorEquals": [
-              "Lambda.ServiceException",
-              "Lambda.AWSLambdaException",
-              "Lambda.SdkClientException",
-              "Lambda.TooManyRequestsException"
-            ],
-            "IntervalSeconds": 1,
-            "MaxAttempts": 3,
-            "BackoffRate": 2,
-            "JitterStrategy": "FULL"
-          }
-        ],
-        "Next": "bronze_orders_crawler"
-      },
-      "bronze_orders_crawler": {
-        "Type": "Task",
-        "Arguments": {
-          "Name": "bronze_orders_crawler"
-        },
-        "Resource": "arn:aws:states:::aws-sdk:glue:startCrawler",
-        "Next": "Wait",
-        "Retry": [
-          {
-            "ErrorEquals": [
-              "States.TaskFailed",
-              "Glue.ConcurrentRunsExceededException",
-              "Glue.OperationTimeoutException"
-            ],
-            "BackoffRate": 2,
-            "IntervalSeconds": 1,
-            "MaxAttempts": 3,
-            "JitterStrategy": "FULL"
-          }
-        ]
-      },
-      "Wait": {
-        "Type": "Wait",
-        "Seconds": 30,
-        "Next": "orders_bronze_to_silver"
-      },
-      "orders_bronze_to_silver": {
-        "Type": "Task",
-        "Resource": "arn:aws:states:::glue:startJobRun.sync",
-        "Arguments": {
-          "JobName": "orders_bronze_to_silver"
-        },
-        "End": true,
-        "Retry": [
-          {
-            "ErrorEquals": [
-              "States.TaskFailed",
-              "Glue.ConcurrentRunsExceededException",
-              "Glue.OperationTimeoutException"
-            ],
-            "BackoffRate": 2,
-            "IntervalSeconds": 1,
-            "MaxAttempts": 3,
-            "JitterStrategy": "FULL"
-          }
-        ]
-      }
-    },
-    "QueryLanguage": "JSONata"
+  "Comment": "Direct-S3 batch retail analytics workflow",
+  "QueryLanguage": "JSONPath",
+  "StartAt": "GenerateBronze",
+  "States": {
+    "GenerateBronze": {"Type":"Task","Resource":"arn:aws:states:::lambda:invoke","Parameters":{"FunctionName.$":"$.resources.lambda_function_arn","Payload.$":"$"},"ResultPath":"$.lambda","Retry":[{"ErrorEquals":["Lambda.ServiceException","Lambda.AWSLambdaException","Lambda.SdkClientException","Lambda.TooManyRequestsException"],"IntervalSeconds":1,"MaxAttempts":3,"BackoffRate":2}],"Catch":[{"ErrorEquals":["States.ALL"],"ResultPath":"$.failure","Next":"PrepareFailure"}],"Next":"ValidateStatus"},
+    "ValidateStatus": {"Type":"Choice","Choices":[{"Variable":"$.lambda.Payload.statusCode","NumericEquals":200,"Next":"ValidateDirectS3"}],"Default":"BadLambdaResult"},
+    "ValidateDirectS3": {"Type":"Choice","Choices":[{"Variable":"$.lambda.Payload.clickstream_ingestion_mode","StringEquals":"direct_s3","Next":"BuildSilverWork"}],"Default":"BadClickstreamMode"},
+    "BadLambdaResult": {"Type":"Pass","Parameters":{"Error":"LambdaResultInvalid","Cause":"Lambda response statusCode was not 200"},"ResultPath":"$.failure","Next":"PrepareFailure"},
+    "BadClickstreamMode": {"Type":"Pass","Parameters":{"Error":"ClickstreamModeInvalid","Cause":"This batch workflow requires direct_s3 Clickstream mode"},"ResultPath":"$.failure","Next":"PrepareFailure"},
+    "BuildSilverWork": {"Type":"Pass","ResultPath":"$.silver_work","Parameters":[
+      {"job.$":"$.resources.glue.jobs.customers","path.$":"$.lambda.Payload.customers_uploaded","catalog.$":"$.resources.glue.catalog_name","database.$":"$.resources.glue.silver_database","table":"silver_customers"},
+      {"job.$":"$.resources.glue.jobs.products","path.$":"$.lambda.Payload.products_uploaded","catalog.$":"$.resources.glue.catalog_name","database.$":"$.resources.glue.silver_database","table":"silver_products"},
+      {"job.$":"$.resources.glue.jobs.orders","path.$":"$.lambda.Payload.orders_uploaded","catalog.$":"$.resources.glue.catalog_name","database.$":"$.resources.glue.silver_database","table":"silver_orders"},
+      {"job.$":"$.resources.glue.jobs.payments","path.$":"$.lambda.Payload.payments_uploaded","catalog.$":"$.resources.glue.catalog_name","database.$":"$.resources.glue.silver_database","table":"silver_payments"},
+      {"job.$":"$.resources.glue.jobs.inventory","path.$":"$.lambda.Payload.inventory_uploaded","catalog.$":"$.resources.glue.catalog_name","database.$":"$.resources.glue.silver_database","table":"silver_inventory"},
+      {"job.$":"$.resources.glue.jobs.clickstream","path.$":"$.lambda.Payload.clickstream_bronze_path","catalog.$":"$.resources.glue.catalog_name","database.$":"$.resources.glue.silver_database","table":"silver_clickstream"}
+    ],"Next":"RunSilver"},
+    "RunSilver": {"Type":"Map","ItemsPath":"$.silver_work","MaxConcurrency":3,"Iterator":{"StartAt":"StartGlue","States":{"StartGlue":{"Type":"Task","Resource":"arn:aws:states:::glue:startJobRun.sync","Parameters":{"JobName.$":"$.job","Arguments":{"--bronze_path.$":"$.path","--catalog_name.$":"$.catalog","--silver_database.$":"$.database","--silver_table.$":"$.table"}},"Retry":[{"ErrorEquals":["Glue.ConcurrentRunsExceededException","Glue.OperationTimeoutException","Glue.ThrottlingException","Glue.ServiceException"],"IntervalSeconds":2,"MaxAttempts":2,"BackoffRate":2}],"End":true}}},"ResultPath":"$.silver_results","Catch":[{"ErrorEquals":["States.ALL"],"ResultPath":"$.failure","Next":"PrepareFailure"}],"Next":"BuildGoldWork"},
+    "BuildGoldWork": {"Type":"Pass","ResultPath":"$.gold_work","Parameters":[
+      {"app.$":"$.resources.emr.application_id","role.$":"$.resources.emr.execution_role_arn","configuration_overrides.$":"$.resources.emr.configuration_overrides","script.$":"$.resources.emr.scripts.product_performance","args.$":"States.Array('--catalog_name',$.resources.glue.catalog_name,'--silver_database',$.resources.glue.silver_database,'--gold_database','retail_gold','--gold_table','gold_product_performance','--snapshot_date',$.processing_date)"},
+      {"app.$":"$.resources.emr.application_id","role.$":"$.resources.emr.execution_role_arn","configuration_overrides.$":"$.resources.emr.configuration_overrides","script.$":"$.resources.emr.scripts.customer_metrics","args.$":"States.Array('--catalog_name',$.resources.glue.catalog_name,'--silver_database',$.resources.glue.silver_database,'--gold_database','retail_gold','--gold_table','gold_customer_metrics','--snapshot_date',$.processing_date)"},
+      {"app.$":"$.resources.emr.application_id","role.$":"$.resources.emr.execution_role_arn","configuration_overrides.$":"$.resources.emr.configuration_overrides","script.$":"$.resources.emr.scripts.daily_sales","args.$":"States.Array('--catalog_name',$.resources.glue.catalog_name,'--silver_database',$.resources.glue.silver_database,'--gold_database','retail_gold','--gold_table','gold_daily_sales','--sales_date',$.processing_date)"},
+      {"app.$":"$.resources.emr.application_id","role.$":"$.resources.emr.execution_role_arn","configuration_overrides.$":"$.resources.emr.configuration_overrides","script.$":"$.resources.emr.scripts.inventory_health","args.$":"States.Array('--catalog_name',$.resources.glue.catalog_name,'--silver_database',$.resources.glue.silver_database,'--gold_database','retail_gold','--gold_table','gold_inventory_health','--snapshot_date',$.processing_date,'--low_stock_threshold',States.Format('{}',$.low_stock_threshold))"},
+      {"app.$":"$.resources.emr.application_id","role.$":"$.resources.emr.execution_role_arn","configuration_overrides.$":"$.resources.emr.configuration_overrides","script.$":"$.resources.emr.scripts.customer_lifetime_value","args.$":"States.Array('--catalog_name',$.resources.glue.catalog_name,'--silver_database',$.resources.glue.silver_database,'--gold_database','retail_gold','--gold_table','gold_customer_lifetime_value','--snapshot_date',$.processing_date)"},
+      {"app.$":"$.resources.emr.application_id","role.$":"$.resources.emr.execution_role_arn","configuration_overrides.$":"$.resources.emr.configuration_overrides","script.$":"$.resources.emr.scripts.clickstream_session_analytics","args.$":"States.Array('--catalog_name',$.resources.glue.catalog_name,'--silver_database',$.resources.glue.silver_database,'--gold_database','retail_gold','--gold_table','gold_clickstream_session_analytics','--processing_date',$.processing_date)"}
+    ],"Next":"RunGold"},
+    "RunGold": {"Type":"Map","ItemsPath":"$.gold_work","MaxConcurrency":2,"Iterator":{"StartAt":"StartEmr","States":{"StartEmr":{"Type":"Task","Resource":"arn:aws:states:::emr-serverless:startJobRun.sync","Parameters":{"ApplicationId.$":"$.app","ExecutionRoleArn.$":"$.role","JobDriver":{"SparkSubmit":{"EntryPoint.$":"$.script","EntryPointArguments.$":"$.args"}},"ConfigurationOverrides.$":"$.configuration_overrides"},"Retry":[{"ErrorEquals":["EMRServerless.ThrottlingException","EMRServerless.ServiceException","EMRServerless.ConcurrentModificationException"],"IntervalSeconds":2,"MaxAttempts":2,"BackoffRate":2}],"End":true}}},"ResultPath":"$.gold_results","Catch":[{"ErrorEquals":["States.ALL"],"ResultPath":"$.failure","Next":"PrepareFailure"}],"Next":"RunConversionFunnel"},
+    "RunConversionFunnel": {"Type":"Task","Resource":"arn:aws:states:::emr-serverless:startJobRun.sync","Parameters":{"ApplicationId.$":"$.resources.emr.application_id","ExecutionRoleArn.$":"$.resources.emr.execution_role_arn","JobDriver":{"SparkSubmit":{"EntryPoint.$":"$.resources.emr.scripts.conversion_funnel","EntryPointArguments.$":"States.Array('--catalog_name',$.resources.glue.catalog_name,'--gold_database','retail_gold','--session_table','gold_clickstream_session_analytics','--gold_table','gold_conversion_funnel','--funnel_date',$.processing_date)"}},"ConfigurationOverrides.$":"$.resources.emr.configuration_overrides"},"Retry":[{"ErrorEquals":["EMRServerless.ThrottlingException","EMRServerless.ServiceException","EMRServerless.ConcurrentModificationException"],"IntervalSeconds":2,"MaxAttempts":2,"BackoffRate":2}],"Catch":[{"ErrorEquals":["States.ALL"],"ResultPath":"$.failure","Next":"PrepareFailure"}],"Next":"ShouldRefreshRedshift"},
+    "ShouldRefreshRedshift": {"Type":"Choice","Choices":[{"Variable":"$.run_redshift_refresh","BooleanEquals":true,"Next":"StartRedshiftRefresh"}],"Default":"ReturnWithoutRedshift"},
+    "StartRedshiftRefresh": {"Type":"Task","Resource":"arn:aws:states:::aws-sdk:redshiftdata:executeStatement","Parameters":{"WorkgroupName.$":"$.resources.redshift.workgroup_name","Database.$":"$.resources.redshift.database","Sql":"CALL retail_serving.refresh_gold_serving();","ClientToken.$":"$.lambda.Payload.run_id"},"ResultPath":"$.redshift_start","Retry":[{"ErrorEquals":["RedshiftData.ThrottlingException","RedshiftData.ServiceUnavailableException","RedshiftData.InternalServerException"],"IntervalSeconds":2,"MaxAttempts":3,"BackoffRate":2}],"Catch":[{"ErrorEquals":["States.ALL"],"ResultPath":"$.failure","Next":"PrepareFailure"}],"Next":"WaitForRedshift"},
+    "WaitForRedshift": {"Type":"Wait","Seconds":3,"Next":"DescribeRedshiftRefresh"},
+    "DescribeRedshiftRefresh": {"Type":"Task","Resource":"arn:aws:states:::aws-sdk:redshiftdata:describeStatement","Parameters":{"Id.$":"$.redshift_start.Id"},"ResultPath":"$.redshift_status","Retry":[{"ErrorEquals":["RedshiftData.ThrottlingException","RedshiftData.ServiceUnavailableException","RedshiftData.InternalServerException"],"IntervalSeconds":2,"MaxAttempts":3,"BackoffRate":2}],"Catch":[{"ErrorEquals":["States.ALL"],"ResultPath":"$.failure","Next":"PrepareFailure"}],"Next":"RedshiftStatus"},
+    "RedshiftStatus": {"Type":"Choice","Choices":[{"Variable":"$.redshift_status.Status","StringEquals":"FINISHED","Next":"ReturnWithRedshift"},{"Variable":"$.redshift_status.Status","StringEquals":"FAILED","Next":"RedshiftStatementFailure"},{"Variable":"$.redshift_status.Status","StringEquals":"ABORTED","Next":"RedshiftStatementFailure"}],"Default":"WaitForRedshift"},
+    "RedshiftStatementFailure": {"Type":"Pass","Parameters":{"Error":"RedshiftStatementFailed","Cause.$":"$.redshift_status.Error"},"ResultPath":"$.failure","Next":"PrepareFailure"},
+    "ReturnWithRedshift": {"Type":"Pass","Parameters":{"status":"SUCCEEDED","run_id.$":"$.lambda.Payload.run_id","processing_date.$":"$.processing_date","clickstream_ingestion_mode.$":"$.lambda.Payload.clickstream_ingestion_mode","redshift_refresh_executed":true},"ResultPath":"$","Next":"Success"},
+    "ReturnWithoutRedshift": {"Type":"Pass","Parameters":{"status":"SUCCEEDED","run_id.$":"$.lambda.Payload.run_id","processing_date.$":"$.processing_date","clickstream_ingestion_mode.$":"$.lambda.Payload.clickstream_ingestion_mode","redshift_refresh_executed":false},"ResultPath":"$","Next":"Success"},
+    "PrepareFailure": {"Type":"Pass","Parameters":{"execution_id.$":"$$.Execution.Id","failing_state.$":"$.failure.Error","cause.$":"$.failure.Cause"},"ResultPath":"$","Next":"Failure"},
+    "Failure": {"Type":"Fail","ErrorPath":"$.failing_state","CausePath":"$.cause"},
+    "Success": {"Type":"Succeed"}
   }
+}

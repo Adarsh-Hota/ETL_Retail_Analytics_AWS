@@ -32,7 +32,12 @@ def _event_record(
 
 
 def generate_clickstream_events(
-    customer_ids, product_ids, num_sessions=20, run_id=None, ingested_at=None
+    customer_ids,
+    product_ids,
+    num_sessions=20,
+    run_id=None,
+    ingested_at=None,
+    reference_timestamp=None,
 ):
     """Generate browsing sessions, including anonymous and non-product events."""
     events = []
@@ -41,7 +46,12 @@ def generate_clickstream_events(
         session_id = f"SESS_{uuid.uuid4().hex[:12]}"
         customer_id = None if random.random() < 0.20 else random.choice(customer_ids)
         device_type = random.choice(DEVICE_TYPES)
-        session_start = datetime.utcnow() - timedelta(minutes=random.randint(0, 60))
+        session_start = (
+            reference_timestamp.replace(tzinfo=None)
+            - timedelta(minutes=random.randint(5, 60))
+            if reference_timestamp is not None
+            else datetime.utcnow() - timedelta(minutes=random.randint(0, 60))
+        )
         product_id = random.choice(product_ids)
 
         sequence = [
@@ -75,7 +85,12 @@ def generate_clickstream_events(
     return events
 
 
-def generate_clickstream_from_orders(order_df, run_id=None, ingested_at=None):
+def generate_clickstream_from_orders(
+    order_df,
+    run_id=None,
+    ingested_at=None,
+    reference_timestamp=None,
+):
     """Generate a plausible conversion path for each generated order."""
     events = []
     for _, order in order_df.iterrows():

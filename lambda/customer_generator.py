@@ -9,7 +9,12 @@ from datetime import datetime, timedelta
 fake = Faker()
 
 
-def generate_customers(num_records=100, run_id=None, ingested_at=None):
+def generate_customers(
+    num_records=100,
+    run_id=None,
+    ingested_at=None,
+    reference_timestamp=None,
+):
 
     loyalty_tiers = [
         "Bronze",
@@ -30,12 +35,17 @@ def generate_customers(num_records=100, run_id=None, ingested_at=None):
 
     for _ in range(num_records):
 
+        reference_time = reference_timestamp or datetime.now()
         signup_date = (
-            datetime.now() -
+            reference_time -
             timedelta(days=random.randint(1, 1095))
         ).date()
 
-        source_updated_at = datetime.utcnow().isoformat()
+        source_updated_at = (
+            reference_time.replace(tzinfo=None).isoformat()
+            if reference_timestamp is not None
+            else datetime.utcnow().isoformat()
+        )
         customer = {
             "source_event_id": str(uuid.uuid4()),
 

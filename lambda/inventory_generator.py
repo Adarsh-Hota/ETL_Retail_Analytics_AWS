@@ -20,7 +20,13 @@ WAREHOUSES = [
 ]
 
 
-def generate_inventory_events(product_ids, num_records=100, run_id=None, ingested_at=None):
+def generate_inventory_events(
+    product_ids,
+    num_records=100,
+    run_id=None,
+    ingested_at=None,
+    reference_timestamp=None,
+):
 
     inventory_events = []
 
@@ -40,6 +46,17 @@ def generate_inventory_events(product_ids, num_records=100, run_id=None, ingeste
         else:
             quantity_change = random.randint(-10, 10)
 
+        event_timestamp = (
+            (
+                reference_timestamp
+                - timedelta(minutes=random.randint(0, 720))
+            ).replace(tzinfo=None).isoformat()
+            if reference_timestamp is not None
+            else (
+                datetime.now()
+                - timedelta(hours=random.randint(1, 720))
+            ).isoformat()
+        )
         inventory_event = {
             "inventory_event_id": (
                 f"INV_{uuid.uuid4().hex[:8].upper()}"
@@ -52,16 +69,7 @@ def generate_inventory_events(product_ids, num_records=100, run_id=None, ingeste
             ),
             "movement_type": movement_type,
             "quantity_change": quantity_change,
-            "event_timestamp": (
-                datetime.now()
-                -
-                timedelta(
-                    hours=random.randint(
-                        1,
-                        720
-                    )
-                )
-            ).isoformat(),
+            "event_timestamp": event_timestamp,
             "ingested_at": ingested_at or datetime.utcnow().isoformat(),
             "run_id": run_id or str(uuid.uuid4()),
         }
@@ -75,7 +83,12 @@ def generate_inventory_events(product_ids, num_records=100, run_id=None, ingeste
     )
 
 
-def generate_inventory_from_orders(order_df, run_id=None, ingested_at=None):
+def generate_inventory_from_orders(
+    order_df,
+    run_id=None,
+    ingested_at=None,
+    reference_timestamp=None,
+):
 
     inventory_events = []
 

@@ -12,6 +12,7 @@ def generate_orders(
         num_records=100,
         run_id=None,
         ingested_at=None,
+        reference_timestamp=None,
     ):
 
     orders = []
@@ -74,7 +75,11 @@ def generate_orders(
             product_id
         ]["price"]
 
-        source_updated_at = datetime.utcnow().isoformat()
+        source_updated_at = (
+            reference_timestamp.replace(tzinfo=None).isoformat()
+            if reference_timestamp is not None
+            else datetime.utcnow().isoformat()
+        )
         order = {
             "source_event_id": str(uuid.uuid4()),
             "order_id": str(uuid.uuid4()),

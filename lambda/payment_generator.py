@@ -22,7 +22,14 @@ PAYMENT_STATUSES = [
 ]
 
 
-def generate_payments(order_lookup, num_records=100, run_id=None, ingested_at=None):
+def generate_payments(
+    order_lookup,
+    num_records=100,
+    run_id=None,
+    ingested_at=None,
+    reference_timestamp=None,
+    order_timestamp_lookup=None,
+):
 
     payments = []
 
@@ -34,7 +41,21 @@ def generate_payments(order_lookup, num_records=100, run_id=None, ingested_at=No
 
         amount = order_lookup[order_id]
 
-        source_updated_at = datetime.utcnow().isoformat()
+        source_updated_at = (
+            reference_timestamp.replace(tzinfo=None).isoformat()
+            if reference_timestamp is not None
+            else datetime.utcnow().isoformat()
+        )
+        payment_timestamp = (
+            order_timestamp_lookup[order_id]
+            if reference_timestamp is not None and order_timestamp_lookup is not None
+            else reference_timestamp.replace(tzinfo=None).isoformat()
+            if reference_timestamp is not None
+            else (
+                datetime.now()
+                - timedelta(minutes=random.randint(1, 10080))
+            ).isoformat()
+        )
         payment = {
             "source_event_id": str(uuid.uuid4()),
 
@@ -56,16 +77,7 @@ def generate_payments(order_lookup, num_records=100, run_id=None, ingested_at=No
             )[0],
             "amount": amount,
             "currency": "INR",
-            "payment_timestamp": (
-                datetime.now()
-                -
-                timedelta(
-                    minutes=random.randint(
-                        1,
-                        10080
-                    )
-                )
-            ).isoformat(),
+            "payment_timestamp": payment_timestamp,
             "ingested_at": ingested_at or source_updated_at,
             "run_id": run_id or str(uuid.uuid4()),
         }

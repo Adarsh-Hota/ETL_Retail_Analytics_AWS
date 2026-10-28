@@ -50,7 +50,12 @@ BRANDS = [
 ]
 
 
-def generate_products(num_records=100, run_id=None, ingested_at=None):
+def generate_products(
+    num_records=100,
+    run_id=None,
+    ingested_at=None,
+    reference_timestamp=None,
+):
 
     products = []
 
@@ -76,7 +81,12 @@ def generate_products(num_records=100, run_id=None, ingested_at=None):
 
         popularity_score = random.randint(1, 100)
 
-        source_updated_at = datetime.utcnow().isoformat()
+        reference_time = reference_timestamp or datetime.now()
+        source_updated_at = (
+            reference_time.replace(tzinfo=None).isoformat()
+            if reference_timestamp is not None
+            else datetime.utcnow().isoformat()
+        )
         product = {
             "source_event_id": str(uuid.uuid4()),
 
@@ -108,7 +118,7 @@ def generate_products(num_records=100, run_id=None, ingested_at=None):
             "popularity_score": popularity_score,
 
             "launch_date": (
-                datetime.now()
+                reference_time
                 -
                 timedelta(
                     days=random.randint(

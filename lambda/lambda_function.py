@@ -6,7 +6,7 @@ import pandas as pd
 import time
 import uuid
 
-from datetime import datetime
+from datetime import datetime, timezone
 from faker import Faker
 from cleanup_utils import (
     reset_data_lake
@@ -53,6 +53,41 @@ def clickstream_ingestion_mode():
             "CLICKSTREAM_INGESTION_MODE must be one of: kinesis, direct_s3"
         )
     return mode
+
+
+def clickstream_firehose_bronze_prefix(bucket_name):
+    """Return the configured Firehose run-partition prefix root for Kinesis."""
+    configured_prefix = os.environ.get("CLICKSTREAM_FIREHOSE_BRONZE_PREFIX", "")
+    prefix = configured_prefix.strip()
+    if not prefix:
+        raise ValueError(
+            "CLICKSTREAM_FIREHOSE_BRONZE_PREFIX must be configured in kinesis mode"
+        )
+    if prefix.lower().startswith("s3://") or "://" in prefix:
+        raise ValueError(
+            "CLICKSTREAM_FIREHOSE_BRONZE_PREFIX must be an S3 key prefix, not an S3 URI"
+        )
+    if prefix.startswith("/"):
+        raise ValueError(
+            "CLICKSTREAM_FIREHOSE_BRONZE_PREFIX must be a relative S3 key prefix"
+        )
+
+    prefix = prefix.rstrip("/")
+    if not prefix:
+        raise ValueError(
+            "CLICKSTREAM_FIREHOSE_BRONZE_PREFIX must be a non-empty S3 key prefix"
+        )
+    if bucket_name in prefix:
+        raise ValueError(
+            "CLICKSTREAM_FIREHOSE_BRONZE_PREFIX must not include the bucket name"
+        )
+
+    normalized_prefix = prefix.lower()
+    if normalized_prefix.count("run_id=") != 1 or not normalized_prefix.endswith("run_id="):
+        raise ValueError(
+            "CLICKSTREAM_FIREHOSE_BRONZE_PREFIX must end with run_id= and must not include a run ID"
+        )
+    return prefix
 
 
 def clickstream_partition_key(event):
@@ -132,6 +167,40 @@ def put_clickstream_records(events, stream_name, kinesis_client, max_retries=3, 
     return delivered
 
 
+def select_reference_timestamp(event, current_utc):
+    """Return the one UTC timestamp that defines a normal or simulated run."""
+    simulation_date = event.get("simulation_date")
+    if simulation_date is None:
+        return current_utc, False, None
+    if not isinstance(simulation_date, str):
+        raise ValueError("simulation_date must be a YYYY-MM-DD string or null")
+
+    try:
+        parsed_date = datetime.strptime(simulation_date, "%Y-%m-%d").date()
+    except ValueError as error:
+        raise ValueError(
+            "simulation_date must be a real YYYY-MM-DD calendar date"
+        ) from error
+    if simulation_date != parsed_date.isoformat():
+        raise ValueError(
+            "simulation_date must be a strict YYYY-MM-DD calendar date"
+        )
+    if parsed_date > current_utc.date():
+        raise ValueError("simulation_date must not be a future UTC date")
+
+    return (
+        datetime(
+            parsed_date.year,
+            parsed_date.month,
+            parsed_date.day,
+            12,
+            tzinfo=timezone.utc,
+        ),
+        True,
+        simulation_date,
+    )
+
+
 
 def lambda_handler(event, context):
 
@@ -156,19 +225,34 @@ def lambda_handler(event, context):
                 "layers successfully reset."
             )
         }
-    
-    now = datetime.now()
-    run_id = str(uuid.uuid4())
-    ingested_at = datetime.utcnow().isoformat()
 
-    year = now.strftime("%Y")
-    month = now.strftime("%m")
-    day = now.strftime("%d")
+    firehose_bronze_prefix_root = None
+    if selected_clickstream_mode == "kinesis":
+        firehose_bronze_prefix_root = clickstream_firehose_bronze_prefix(
+            BUCKET_NAME
+        )
+
+    current_utc = datetime.now(timezone.utc)
+    batch_timestamp, simulation_mode, simulation_date = select_reference_timestamp(
+        event,
+        current_utc,
+    )
+    reference_timestamp = batch_timestamp if simulation_mode else None
+    run_id = str(uuid.uuid4())
+    # Keep the established naive ISO timestamp representation while deriving it
+    # and all Bronze partition values from this one UTC instant.
+    ingested_at = batch_timestamp.replace(tzinfo=None).isoformat()
+
+    year = batch_timestamp.strftime("%Y")
+    month = batch_timestamp.strftime("%m")
+    day = batch_timestamp.strftime("%d")
+    processing_date = batch_timestamp.strftime("%Y-%m-%d")
 
     customer_df = generate_customers(
         100,
         run_id=run_id,
         ingested_at=ingested_at,
+        reference_timestamp=reference_timestamp,
     )
 
     customer_ids = (
@@ -187,6 +271,7 @@ def lambda_handler(event, context):
         100,
         run_id=run_id,
         ingested_at=ingested_at,
+        reference_timestamp=reference_timestamp,
     )
 
     product_ids = (
@@ -208,6 +293,7 @@ def lambda_handler(event, context):
         num_records=100,
         run_id=run_id,
         ingested_at=ingested_at,
+        reference_timestamp=reference_timestamp,
     )
 
     order_lookup = (
@@ -216,12 +302,20 @@ def lambda_handler(event, context):
         ["total_amount"]
         .to_dict()
     )
+    order_timestamp_lookup = (
+        order_df
+        .set_index("order_id")
+        ["order_timestamp"]
+        .to_dict()
+    )
 
     payment_df = generate_payments(
         order_lookup,
         num_records=100,
         run_id=run_id,
         ingested_at=ingested_at,
+        reference_timestamp=reference_timestamp,
+        order_timestamp_lookup=order_timestamp_lookup,
     )
 
     operational_inventory_df = (
@@ -230,6 +324,7 @@ def lambda_handler(event, context):
             100,
             run_id=run_id,
             ingested_at=ingested_at,
+            reference_timestamp=reference_timestamp,
         )
     )
 
@@ -238,6 +333,7 @@ def lambda_handler(event, context):
             order_df,
             run_id=run_id,
             ingested_at=ingested_at,
+            reference_timestamp=reference_timestamp,
         )
     )
 
@@ -255,6 +351,7 @@ def lambda_handler(event, context):
             num_sessions=20,
             run_id=run_id,
             ingested_at=ingested_at,
+            reference_timestamp=reference_timestamp,
     )
 
     order_clickstream_events = (
@@ -262,6 +359,7 @@ def lambda_handler(event, context):
             order_df,
             run_id=run_id,
             ingested_at=ingested_at,
+            reference_timestamp=reference_timestamp,
         )
     )
 
@@ -362,19 +460,39 @@ def lambda_handler(event, context):
             clickstream_stream_name,
             boto3.client("kinesis"),
         )
+        clickstream_bronze_prefix = (
+            f"{firehose_bronze_prefix_root}{run_id}/"
+        )
+        clickstream_bronze_path = (
+            f"s3://{BUCKET_NAME}/{clickstream_bronze_prefix}"
+        )
         clickstream_result = {
             "clickstream_stream": clickstream_stream_name,
             "clickstream_records_delivered": clickstream_records_delivered,
+            "clickstream_bronze_bucket": BUCKET_NAME,
+            "clickstream_bronze_prefix": clickstream_bronze_prefix,
+            "clickstream_bronze_path": clickstream_bronze_path,
         }
         print(
-            "Clickstream kinesis run_id=%s delivered_records=%s stream=%s"
-            % (run_id, clickstream_records_delivered, clickstream_stream_name)
+            "Clickstream kinesis run_id=%s delivered_records=%s stream=%s bronze_prefix=%s"
+            % (
+                run_id,
+                clickstream_records_delivered,
+                clickstream_stream_name,
+                clickstream_bronze_prefix,
+            )
         )
 
     result = {
         "statusCode": 200,
 
         "run_id": run_id,
+
+        "processing_date": processing_date,
+
+        "simulation_mode": simulation_mode,
+
+        "simulation_date": simulation_date,
 
         "clickstream_ingestion_mode": selected_clickstream_mode,
 

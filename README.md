@@ -16,7 +16,7 @@ for the right deliveries before the downstream tables are built.
 
 ## What the system looks like
 
-<img src="assets/architecture/retail-analytics-platform-architecture.png" alt="Architecture diagram showing retail batch and Clickstream ingestion through S3 Bronze, Glue Silver, EMR Gold, and Redshift, with Step Functions orchestration and monitoring" width="100%">
+<img src="assets/architecture/retail-analytics-platform-architecture.webp" alt="Architecture diagram showing retail batch and Clickstream ingestion through S3 Bronze, Glue Silver, EMR Gold, and Redshift, with Step Functions orchestration and monitoring" width="100%">
 
 <p align="center"><em>System architecture</em></p>
 
@@ -49,7 +49,7 @@ CDK, or CloudFormation in this repository.
 
 <br>
 
-<img src="assets/architecture/retail-data-lineage.png" alt="Data lineage from Bronze domains through Silver modelling patterns to Gold marts and Redshift serving tables" width="100%">
+<img src="assets/architecture/retail-data-lineage.webp" alt="Data lineage from Bronze domains through Silver modelling patterns to Gold marts and Redshift serving tables" width="100%">
 
 <p align="center"><em>Data lineage, modelling choices, and the session to funnel dependency</em></p>
 
@@ -102,11 +102,11 @@ append event records because the event history itself is useful.
 | Inventory Health | Product and warehouse inventory positions, movements, and stock status |
 | Customer Lifetime Value | Observed customer value, purchase frequency, recency, and payment metrics |
 
-<img src="assets/screenshots/lakehouse/glue-catalog-silver-tables.png" alt="Six Silver Apache Iceberg tables in AWS Glue Data Catalog" width="100%">
+<img src="assets/screenshots/lakehouse/glue-catalog-silver-tables.webp" alt="Six Silver Apache Iceberg tables in AWS Glue Data Catalog" width="100%">
 
 <p align="center"><em>Silver Iceberg tables in the Glue Data Catalog</em></p>
 
-<img src="assets/screenshots/lakehouse/glue-catalog-gold-tables.png" alt="Seven Gold Apache Iceberg tables in AWS Glue Data Catalog" width="100%">
+<img src="assets/screenshots/lakehouse/glue-catalog-gold-tables.webp" alt="Seven Gold Apache Iceberg tables in AWS Glue Data Catalog" width="100%">
 
 <p align="center"><em>Gold Iceberg marts in the Glue Data Catalog</em></p>
 
@@ -119,23 +119,23 @@ These screenshots show the AWS setup used by the project.
 
 <br>
 
-<img src="assets/screenshots/ingestion/lambda-function-configuration.png" alt="Lambda function configuration" width="100%">
+<img src="assets/screenshots/ingestion/lambda-function-configuration.webp" alt="Lambda function configuration" width="100%">
 
 <p align="center"><em>Lambda data generator</em></p>
 
-<img src="assets/screenshots/ingestion/lambda-layer-configuration.png" alt="Lambda layer configuration" width="100%">
+<img src="assets/screenshots/ingestion/lambda-layer-configuration.webp" alt="Lambda layer configuration" width="100%">
 
 <p align="center"><em>Lambda dependency layer</em></p>
 
-<img src="assets/screenshots/ingestion/kinesis-data-stream-configuration.png" alt="Kinesis Data Streams configuration" width="100%">
+<img src="assets/screenshots/ingestion/kinesis-data-stream-configuration.webp" alt="Kinesis Data Streams configuration" width="100%">
 
 <p align="center"><em>Kinesis Data Stream for Clickstream events</em></p>
 
-<img src="assets/screenshots/ingestion/firehose-dynamic-partitioning.png" alt="Firehose run ID dynamic partitioning configuration" width="100%">
+<img src="assets/screenshots/ingestion/firehose-dynamic-partitioning.webp" alt="Firehose run ID dynamic partitioning configuration" width="100%">
 
 <p align="center"><em>Firehose dynamic partitioning by <code>run_id</code></em></p>
 
-<img src="assets/screenshots/ingestion/firehose-destination-settings.png" alt="Firehose S3 destination settings" width="100%">
+<img src="assets/screenshots/ingestion/firehose-destination-settings.webp" alt="Firehose S3 destination settings" width="100%">
 
 <p align="center"><em>Firehose S3 landing destination</em></p>
 
@@ -146,39 +146,39 @@ These screenshots show the AWS setup used by the project.
 
 <br>
 
-<img src="assets/screenshots/lakehouse/s3-platform-bucket-layout.png" alt="S3 bucket layout for the retail analytics platform" width="100%">
+<img src="assets/screenshots/lakehouse/s3-platform-bucket-layout.webp" alt="S3 bucket layout for the retail analytics platform" width="100%">
 
 <p align="center"><em>S3 platform layout</em></p>
 
-<img src="assets/screenshots/lakehouse/s3-bronze-layer.png" alt="S3 Bronze layer" width="100%">
+<img src="assets/screenshots/lakehouse/s3-bronze-layer.webp" alt="S3 Bronze layer" width="100%">
 
 <p align="center"><em>Immutable Bronze storage</em></p>
 
-<img src="assets/screenshots/lakehouse/s3-bronze-data.png" alt="Bronze data files in S3" width="100%">
+<img src="assets/screenshots/lakehouse/s3-bronze-data.webp" alt="Bronze data files in S3" width="100%">
 
 <p align="center"><em>Bronze data files</em></p>
 
-<img src="assets/screenshots/lakehouse/glue-catalog-databases.png" alt="AWS Glue Data Catalog databases" width="100%">
+<img src="assets/screenshots/lakehouse/glue-catalog-databases.webp" alt="AWS Glue Data Catalog databases" width="100%">
 
 <p align="center"><em>Glue Catalog databases</em></p>
 
-<img src="assets/screenshots/lakehouse/s3-silver-layer.png" alt="S3 Silver layer" width="100%">
+<img src="assets/screenshots/lakehouse/s3-silver-layer.webp" alt="S3 Silver layer" width="100%">
 
 <p align="center"><em>Silver Iceberg storage</em></p>
 
-<img src="assets/screenshots/lakehouse/s3-silver-data.png" alt="Silver Iceberg table data in S3" width="100%">
+<img src="assets/screenshots/lakehouse/s3-silver-data.webp" alt="Silver Iceberg table data in S3" width="100%">
 
 <p align="center"><em>Silver Iceberg table data</em></p>
 
-<img src="assets/screenshots/lakehouse/s3-silver-iceberg-metadata.png" alt="Silver Iceberg table metadata in S3" width="100%">
+<img src="assets/screenshots/lakehouse/s3-silver-iceberg-metadata.webp" alt="Silver Iceberg table metadata in S3" width="100%">
 
 <p align="center"><em>Silver Iceberg metadata</em></p>
 
-<img src="assets/screenshots/lakehouse/s3-gold-layer.png" alt="S3 Gold layer" width="100%">
+<img src="assets/screenshots/lakehouse/s3-gold-layer.webp" alt="S3 Gold layer" width="100%">
 
 <p align="center"><em>Gold Iceberg storage</em></p>
 
-<img src="assets/screenshots/lakehouse/s3-gold-iceberg-table-data.png" alt="Gold Iceberg table data in S3" width="100%">
+<img src="assets/screenshots/lakehouse/s3-gold-iceberg-table-data.webp" alt="Gold Iceberg table data in S3" width="100%">
 
 <p align="center"><em>Gold mart data files</em></p>
 
@@ -189,23 +189,23 @@ These screenshots show the AWS setup used by the project.
 
 <br>
 
-<img src="assets/screenshots/processing/glue-etl-jobs.png" alt="AWS Glue ETL job definitions" width="100%">
+<img src="assets/screenshots/processing/glue-etl-jobs_converted.webp" alt="AWS Glue ETL job definitions" width="100%">
 
 <p align="center"><em>Glue ETL job definitions</em></p>
 
-<img src="assets/screenshots/processing/glue-etl-job-script.png" alt="AWS Glue ETL job script configuration" width="100%">
+<img src="assets/screenshots/processing/glue-etl-job-script_converted.webp" alt="AWS Glue ETL job script configuration" width="100%">
 
 <p align="center"><em>A Glue job pointing at its transformation script</em></p>
 
-<img src="assets/screenshots/processing/glue-job-runs.png" alt="Successful AWS Glue job runs" width="100%">
+<img src="assets/screenshots/processing/glue-job-runs_converted.webp" alt="Successful AWS Glue job runs" width="100%">
 
 <p align="center"><em>Glue job runs for the Silver layer</em></p>
 
-<img src="assets/screenshots/processing/emr-serverless-application.png" alt="EMR Serverless application configuration" width="100%">
+<img src="assets/screenshots/processing/emr-serverless-application_converted.webp" alt="EMR Serverless application configuration" width="100%">
 
 <p align="center"><em>EMR Serverless Spark application</em></p>
 
-<img src="assets/screenshots/processing/emr-serverless-job-runs.png" alt="Successful EMR Serverless Gold job runs" width="100%">
+<img src="assets/screenshots/processing/emr-serverless-job-runs_converted.webp" alt="Successful EMR Serverless Gold job runs" width="100%">
 
 <p align="center"><em>EMR Serverless job runs for Gold marts</em></p>
 
@@ -216,35 +216,35 @@ These screenshots show the AWS setup used by the project.
 
 <br>
 
-<img src="assets/screenshots/orchestration/step-functions-designer.png" alt="Step Functions state machine designer" width="100%">
+<img src="assets/screenshots/orchestration/step-functions-designer_converted.webp" alt="Step Functions state machine designer" width="100%">
 
 <p align="center"><em>Step Functions state machine design</em></p>
 
-<img src="assets/screenshots/orchestration/step-functions-job-runs.png" alt="Step Functions execution with downstream jobs" width="100%">
+<img src="assets/screenshots/orchestration/step-functions-job-runs_converted.webp" alt="Step Functions execution with downstream jobs" width="100%">
 
 <p align="center"><em>State machine execution coordinating downstream jobs</em></p>
 
-<img src="assets/screenshots/orchestration/step-functions-historical-simulation.png" alt="Step Functions historical simulation run" width="100%">
+<img src="assets/screenshots/orchestration/step-functions-historical-simulation_converted.webp" alt="Step Functions historical simulation run" width="100%">
 
 <p align="center"><em>Historical simulation run</em></p>
 
-<img src="assets/screenshots/orchestration/eventbridge-schedule.png" alt="EventBridge Scheduler configuration" width="100%">
+<img src="assets/screenshots/orchestration/eventbridge-schedule_converted.webp" alt="EventBridge Scheduler configuration" width="100%">
 
 <p align="center"><em>EventBridge Scheduler starting the state machine</em></p>
 
-<img src="assets/screenshots/operations/sns-alert-topic.png" alt="SNS alert topic" width="100%">
+<img src="assets/screenshots/operations/sns-alert-topic.webp" alt="SNS alert topic" width="100%">
 
 <p align="center"><em>SNS pipeline notification topic</em></p>
 
-<img src="assets/screenshots/operations/step-functions-success-alert.png" alt="Step Functions success alert" width="100%">
+<img src="assets/screenshots/operations/step-functions-success-alert.webp" alt="Step Functions success alert" width="100%">
 
 <p align="center"><em>Step Functions success notification</em></p>
 
-<img src="assets/screenshots/operations/step-functions-failure-alert.png" alt="Step Functions failure alert" width="100%">
+<img src="assets/screenshots/operations/step-functions-failure-alert.webp" alt="Step Functions failure alert" width="100%">
 
 <p align="center"><em>Step Functions failure notification</em></p>
 
-<img src="assets/screenshots/operations/sqs-scheduler-dlq.png" alt="SQS Scheduler dead-letter queue configuration" width="100%">
+<img src="assets/screenshots/operations/sqs-scheduler-dlq.webp" alt="SQS Scheduler dead-letter queue configuration" width="100%">
 
 <p align="center"><em>Scheduler dead letter queue</em></p>
 
@@ -288,11 +288,11 @@ These screenshots show the AWS setup used by the project.
    selected Gold marts into native serving tables and views for the SQL queries
    and charts.
 
-<img src="assets/architecture/kinesis-aware-run-lifecycle.png" alt="Kinesis aware pipeline run lifecycle with parallel batch and Clickstream processing" width="100%">
+<img src="assets/architecture/kinesis-aware-run-lifecycle.webp" alt="Kinesis aware pipeline run lifecycle with parallel batch and Clickstream processing" width="100%">
 
 <p align="center"><em>Kinesis aware pipeline run lifecycle</em></p>
 
-<img src="assets/screenshots/orchestration/step-functions-kinesis-success.png" alt="Successful Kinesis aware Step Functions execution" width="100%">
+<img src="assets/screenshots/orchestration/step-functions-kinesis-success_converted.webp" alt="Successful Kinesis aware Step Functions execution" width="100%">
 
 <p align="center"><em>A complete Kinesis aware Step Functions run</em></p>
 
@@ -330,31 +330,31 @@ Gold Iceberg tables remain the analytical source of truth. Redshift copies the
 chosen marts into native serving tables and views, which gave me a place to run
 analyst SQL and make charts.
 
-<img src="assets/screenshots/serving/redshift-daily-gross-revenue.png" alt="Daily gross revenue chart in Redshift Query Editor v2" width="100%">
+<img src="assets/screenshots/serving/redshift-daily-gross-revenue_converted.webp" alt="Daily gross revenue chart in Redshift Query Editor v2" width="100%">
 
 <p align="center"><em>Daily gross revenue</em></p>
 
-<img src="assets/screenshots/serving/redshift-daily-revenue-by-category.png" alt="Daily revenue by product category chart in Redshift Query Editor v2" width="100%">
+<img src="assets/screenshots/serving/redshift-daily-revenue-by-category_converted.webp" alt="Daily revenue by product category chart in Redshift Query Editor v2" width="100%">
 
 <p align="center"><em>Daily revenue by product category</em></p>
 
-<img src="assets/screenshots/serving/redshift-inventory-risk.png" alt="Inventory risk chart in Redshift Query Editor v2" width="100%">
+<img src="assets/screenshots/serving/redshift-inventory-risk_converted.webp" alt="Inventory risk chart in Redshift Query Editor v2" width="100%">
 
 <p align="center"><em>Inventory positions below the stock threshold</em></p>
 
-<img src="assets/screenshots/serving/redshift-payment-performance.png" alt="Payment performance chart in Redshift Query Editor v2" width="100%">
+<img src="assets/screenshots/serving/redshift-payment-performance_converted.webp" alt="Payment performance chart in Redshift Query Editor v2" width="100%">
 
 <p align="center"><em>Payment performance</em></p>
 
-<img src="assets/screenshots/serving/redshift-conversion-funnel.png" alt="Conversion funnel chart in Redshift Query Editor v2" width="100%">
+<img src="assets/screenshots/serving/redshift-conversion-funnel_converted.webp" alt="Conversion funnel chart in Redshift Query Editor v2" width="100%">
 
 <p align="center"><em>Conversion funnel by session stage</em></p>
 
-<img src="assets/screenshots/serving/redshift-customer-lifetime-value.png" alt="Customer lifetime value chart in Redshift Query Editor v2" width="100%">
+<img src="assets/screenshots/serving/redshift-customer-lifetime-value_converted.webp" alt="Customer lifetime value chart in Redshift Query Editor v2" width="100%">
 
 <p align="center"><em>Customer lifetime value</em></p>
 
-<img src="assets/screenshots/serving/redshift-customer-segmentation.png" alt="Customer segmentation chart in Redshift Query Editor v2" width="100%">
+<img src="assets/screenshots/serving/redshift-customer-segmentation_converted.webp" alt="Customer segmentation chart in Redshift Query Editor v2" width="100%">
 
 <p align="center"><em>Customer segmentation</em></p>
 
